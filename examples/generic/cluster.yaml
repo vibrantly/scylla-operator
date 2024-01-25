@@ -1,10 +1,4 @@
-# Namespace where the Scylla Cluster will be created
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: scylla
 
----
 
 # Simple Scylla Cluster
 apiVersion: scylla.scylladb.com/v1
@@ -12,32 +6,46 @@ kind: ScyllaCluster
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: simple-cluster
-  namespace: scylla
+  name: scylla-non-prod
+  namespace: scylla-cluster
 spec:
   version: 5.2.7
   agentVersion: 3.1.2
   developerMode: true
+  backups:
+  - name: "Daily Backup"
+    rateLimit: ["50"]
+    location: ["gcs:scylla-bucket-non-prod"]
+    interval: "1d"
+    retention: 7
   datacenter:
-    name: us-east-1
+    name: europe-west3
     racks:
-      - name: us-east-1a
+      - name: europe-west-3b
         scyllaConfig: "scylla-config"
-        scyllaAgentConfig: "scylla-agent-config"
-        members: 3
+        scyllaAgentConfig: "scylla-agent-config-secret"
+        members: 4
         storage:
-          capacity: 5Gi
+          capacity: 75Gi
+          storageClassName: standard-rwo
         resources:
           requests:
-            cpu: 1
+            cpu: 500m
             memory: 1Gi
           limits:
-            cpu: 1
-            memory: 1Gi
+            cpu: 900m
+            memory: 2Gi
+        placement:
+          tolerations:
+          - effect: NoSchedule
+            key: role
+            operator: Equal
+            value: scylla-non-prod
+        agentVolumeMounts:
+          - name: scylla-manager-agent-gcs-service-account-volume
+            mountPath: /mnt/scylla-manager-agent/gcp-sa.json
+            subPath: gcp-sa.json
         volumes:
-          - name: coredumpfs
-            hostPath:
-              path: /tmp/coredumps
-        volumeMounts:
-          - mountPath: /tmp/coredumps
-            name: coredumpfs
+          - name: scylla-manager-agent-gcs-service-account-volume
+            secret:
+              secretName: gcs-service-account
